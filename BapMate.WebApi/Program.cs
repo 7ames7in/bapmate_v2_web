@@ -43,18 +43,11 @@ builder.Services.AddControllers();
 builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
 
-// 데이터베이스 연결 설정 (Postgres 연결 정보가 입력되었으면 Postgres, 없으면 기본 SQLite 사용)
+// 데이터베이스 연결 설정 (Postgres)
 builder.Services.AddDbContext<BapMateDbContext>(opt =>
 {
     var postgresConn = builder.Configuration.GetConnectionString("Postgres");
-    if (!string.IsNullOrEmpty(postgresConn) && !postgresConn.Contains("YOUR_PASSWORD_HERE"))
-    {
-        opt.UseNpgsql(postgresConn);
-    }
-    else
-    {
-        opt.UseSqlite(builder.Configuration.GetConnectionString("Default"));
-    }
+    opt.UseNpgsql(postgresConn);
 });
 
 builder.Services.AddEndpointsApiExplorer();
