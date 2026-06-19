@@ -1,9 +1,34 @@
 #!/bin/bash
 # bapmate_v2_web VPS deployment script
+set -e
+
 echo "=== Starting bapmate_v2_web deployment on VPS ==="
 
+cleanup_git_askpass() {
+    if [ -n "${GIT_ASKPASS_FILE:-}" ] && [ -f "$GIT_ASKPASS_FILE" ]; then
+        rm -f "$GIT_ASKPASS_FILE"
+    fi
+}
+trap cleanup_git_askpass EXIT
+
+if [ -n "${BAPMATE_GITHUB_TOKEN:-}" ]; then
+    GIT_ASKPASS_FILE="$(mktemp)"
+    chmod 700 "$GIT_ASKPASS_FILE"
+    cat > "$GIT_ASKPASS_FILE" <<'EOF'
+#!/bin/sh
+case "$1" in
+  *Username*) printf '%s\n' "x-access-token" ;;
+  *Password*) printf '%s\n' "$BAPMATE_GITHUB_TOKEN" ;;
+  *) printf '\n' ;;
+esac
+EOF
+    chmod +x "$GIT_ASKPASS_FILE"
+    export GIT_ASKPASS="$GIT_ASKPASS_FILE"
+    export GIT_TERMINAL_PROMPT=0
+fi
+
 # 1. Pull latest code from GitHub
-git pull origin main
+git pull --ff-only origin main
 
 # 2. Build and Deploy
 if [ -f "docker-compose.yml" ]; then
