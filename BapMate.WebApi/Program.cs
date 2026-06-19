@@ -59,10 +59,42 @@ builder.Services.AddSwaggerGen(options =>
 var app = builder.Build();
 
 // ---- 운영/개발 공통: 시작 시 마이그레이션 자동 적용 ----
-using (var scope = app.Services.CreateScope())
+try
 {
-    var db = scope.ServiceProvider.GetRequiredService<BapMateDbContext>();
-    await BapMateDbInitializer.InitializeAsync(db);
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<BapMateDbContext>();
+        await BapMateDbInitializer.InitializeAsync(db);
+    }
+}
+catch (Exception ex)
+{
+    Console.ForegroundColor = ConsoleColor.Red;
+    Console.WriteLine("==============================================================");
+    Console.WriteLine("❌ [DATABASE CONNECTION ERROR]");
+    Console.WriteLine("시작 시 PostgreSQL 데이터베이스 연결에 실패했습니다.");
+    Console.WriteLine($"에러 메시지: {ex.Message}");
+    
+    var connString = builder.Configuration.GetConnectionString("Postgres");
+    if (!string.IsNullOrEmpty(connString))
+    {
+        var maskedConnString = System.Text.RegularExpressions.Regex.Replace(
+            connString, 
+            "Password=[^;]+", 
+            "Password=******", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        Console.WriteLine($"설정된 Connection String: {maskedConnString}");
+    }
+    
+    Console.WriteLine("\n[확인 필요 사항]");
+    Console.WriteLine("1. PostgreSQL 도커 컨테이너 또는 DB 서버가 정상 실행 중인지 확인하세요.");
+    Console.WriteLine("2. appsettings.json 또는 환경 변수의 Postgres 연결 정보가 맞는지 확인하세요.");
+    Console.WriteLine("3. 호스트명(Host), 포트(Port), 사용자명(Username), 비밀번호(Password)가 올바른지 확인하세요.");
+    Console.WriteLine("==============================================================");
+    Console.ResetColor();
+
+    // 애플리케이션을 즉시 에러 코드로 종료시킵니다.
+    Environment.Exit(1);
 }
 
 // CORS (Auth/Controllers 앞)
