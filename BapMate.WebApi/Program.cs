@@ -92,9 +92,6 @@ catch (Exception ex)
     Console.WriteLine("3. 호스트명(Host), 포트(Port), 사용자명(Username), 비밀번호(Password)가 올바른지 확인하세요.");
     Console.WriteLine("==============================================================");
     Console.ResetColor();
-
-    // 애플리케이션을 즉시 에러 코드로 종료시킵니다.
-    Environment.Exit(1);
 }
 
 // CORS (Auth/Controllers 앞)
