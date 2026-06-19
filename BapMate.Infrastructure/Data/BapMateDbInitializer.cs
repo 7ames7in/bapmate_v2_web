@@ -157,12 +157,6 @@ public static class BapMateDbInitializer
     public static async Task InitializeAsync(BapMateDbContext context, CancellationToken cancellationToken = default)
     {
         await context.Database.EnsureCreatedAsync(cancellationToken);
-        await EnsurePaymentTransactionsTableAsync(context, cancellationToken);
-        await EnsureUsersColumnAsync(context, "Carrier", "TEXT NOT NULL DEFAULT ''", cancellationToken);
-        await EnsureUsersColumnAsync(context, "Phone", "TEXT NOT NULL DEFAULT ''", cancellationToken);
-        await EnsureUsersColumnAsync(context, "Password", "TEXT NOT NULL DEFAULT ''", cancellationToken);
-        await EnsureUsersColumnAsync(context, "Gender", "TEXT NOT NULL DEFAULT 'male'", cancellationToken);
-        await EnsureUsersColumnAsync(context, "BirthYear", "INTEGER NOT NULL DEFAULT 1995", cancellationToken);
 
         if (await context.Users.AnyAsync(cancellationToken))
         {
@@ -200,36 +194,7 @@ public static class BapMateDbInitializer
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task EnsurePaymentTransactionsTableAsync(BapMateDbContext context, CancellationToken cancellationToken)
-    {
-        if (!context.Database.IsSqlite())
-        {
-            return;
-        }
 
-        const string createTableSql = @"
-CREATE TABLE IF NOT EXISTS ""PaymentTransactions"" (
-    ""Id"" TEXT NOT NULL CONSTRAINT ""PK_PaymentTransactions"" PRIMARY KEY,
-    ""UserId"" TEXT NOT NULL,
-    ""Title"" TEXT NOT NULL,
-    ""Category"" TEXT NOT NULL,
-    ""Type"" TEXT NOT NULL,
-    ""Direction"" TEXT NOT NULL,
-    ""Amount"" TEXT NOT NULL,
-    ""WalletDelta"" TEXT NOT NULL,
-    ""EscrowDelta"" TEXT NOT NULL,
-    ""WalletBalanceAfter"" TEXT NOT NULL,
-    ""EscrowBalanceAfter"" TEXT NOT NULL,
-    ""Currency"" TEXT NOT NULL,
-    ""Counterparty"" TEXT NULL,
-    ""ReferenceId"" TEXT NULL,
-    ""ReferenceType"" TEXT NULL,
-    ""Memo"" TEXT NULL,
-    ""CreatedAt"" TEXT NOT NULL
-);";
-
-        await context.Database.ExecuteSqlRawAsync(createTableSql, cancellationToken);
-    }
 
     private static IReadOnlyCollection<User> CreateUsers() =>
         Enumerable.Range(1, 30)
@@ -405,46 +370,7 @@ CREATE TABLE IF NOT EXISTS ""PaymentTransactions"" (
         return transactions;
     }
 
-    private static async Task EnsureUsersColumnAsync(
-        BapMateDbContext context,
-        string columnName,
-        string columnDefinition,
-        CancellationToken cancellationToken)
-    {
-        if (!context.Database.IsSqlite())
-        {
-            return;
-        }
 
-        var connection = context.Database.GetDbConnection();
-        var shouldClose = connection.State != ConnectionState.Open;
-        if (shouldClose)
-        {
-            await connection.OpenAsync(cancellationToken);
-        }
-
-        try
-        {
-            await using (var checkCommand = connection.CreateCommand())
-            {
-                checkCommand.CommandText = $"SELECT 1 FROM pragma_table_info('Users') WHERE name = '{columnName}';";
-                var result = await checkCommand.ExecuteScalarAsync(cancellationToken);
-                if (result is null)
-                {
-                    await using var alterCommand = connection.CreateCommand();
-                    alterCommand.CommandText = $"ALTER TABLE Users ADD COLUMN {columnName} {columnDefinition};";
-                    await alterCommand.ExecuteNonQueryAsync(cancellationToken);
-                }
-            }
-        }
-        finally
-        {
-            if (shouldClose)
-            {
-                await connection.CloseAsync();
-            }
-        }
-    }
 
     private static string DetermineFlow(decimal walletDelta, decimal escrowDelta)
     {
