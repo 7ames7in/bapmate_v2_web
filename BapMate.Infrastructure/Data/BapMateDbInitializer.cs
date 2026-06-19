@@ -8,7 +8,7 @@ public static class BapMateDbInitializer
 {
     public static async Task InitializeAsync(BapMateDbContext context, CancellationToken cancellationToken = default)
     {
-        // Apply pending migrations to ensure tables are created correctly
-        await context.Database.MigrateAsync(cancellationToken);
+        // Use EnsureCreatedAsync since migrations are removed and we want the DB schema to be created automatically on startup
+        await context.Database.EnsureCreatedAsync(cancellationToken);
     }
 }
