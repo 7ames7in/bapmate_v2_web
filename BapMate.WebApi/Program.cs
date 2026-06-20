@@ -73,7 +73,7 @@ catch (Exception ex)
     Console.WriteLine("==============================================================");
     Console.WriteLine("❌ [DATABASE CONNECTION ERROR]");
     Console.WriteLine("시작 시 PostgreSQL 데이터베이스 연결에 실패했습니다.");
-    Console.WriteLine($"에러 메시지: {ex.Message}");
+    Console.WriteLine($"에러 상세 정보:\n{ex}");
     
     var connString = builder.Configuration.GetConnectionString("Postgres");
     if (!string.IsNullOrEmpty(connString))
