@@ -204,6 +204,25 @@ public class BombGameHub : Hub
         await base.OnDisconnectedAsync(exception);
     }
 
+    /// <summary>Query the game type associated with a specific room ID.</summary>
+    public async Task<string> GetRoomGameType(string roomId)
+    {
+        if (Rooms.TryGetValue(roomId, out var room))
+        {
+            // SettingsJson contains: {"gameType":"roulette"} or similar
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(room.SettingsJson);
+                if (doc.RootElement.TryGetProperty("gameType", out var typeProp))
+                {
+                    return typeProp.GetString() ?? "bomb";
+                }
+            }
+            catch { }
+        }
+        return "unknown";
+    }
+
     // ─── User registration & messaging ──────────────────────────────────
 
     /// <summary>Register a user's name to their connection (for messaging).</summary>
