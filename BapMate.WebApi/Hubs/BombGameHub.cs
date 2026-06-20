@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
+using BapMate.Infrastructure.Data;
+using BapMate.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace BapMate.WebApi.Hubs;
 
@@ -9,6 +12,13 @@ namespace BapMate.WebApi.Hubs;
 /// </summary>
 public class BombGameHub : Hub
 {
+    private readonly BapMateDbContext _dbContext;
+
+    public BombGameHub(BapMateDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
     // In-memory room registry (lives as long as the server process)
     private static readonly ConcurrentDictionary<string, BombRoom> Rooms = new();
 
@@ -42,6 +52,18 @@ public class BombGameHub : Hub
                 }
                 await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
                 await Clients.Caller.SendAsync("RoomCreated", roomId, hostName);
+
+                // Update DB
+                var dbRoom = await _dbContext.GameRooms.FirstOrDefaultAsync(r => r.Id == roomId);
+                if (dbRoom != null)
+                {
+                    var names = existingRoom.Players.Select(p => p.Name).ToList();
+                    dbRoom.PlayersJson = System.Text.Json.JsonSerializer.Serialize(names);
+                    dbRoom.IsStarted = existingRoom.IsStarted;
+                    dbRoom.IsEnded = false;
+                    dbRoom.UpdatedAt = DateTime.UtcNow;
+                    await _dbContext.SaveChangesAsync();
+                }
                 return;
             }
             else
@@ -66,6 +88,34 @@ public class BombGameHub : Hub
             return;
         }
 
+        // Save/Update in DB
+        var dbRoomNew = await _dbContext.GameRooms.FirstOrDefaultAsync(r => r.Id == roomId);
+        if (dbRoomNew == null)
+        {
+            dbRoomNew = new GameRoom
+            {
+                Id = roomId,
+                HostName = hostName,
+                SettingsJson = settingsJson,
+                PlayersJson = System.Text.Json.JsonSerializer.Serialize(new List<string> { hostName }),
+                IsStarted = false,
+                IsEnded = false,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _dbContext.GameRooms.Add(dbRoomNew);
+        }
+        else
+        {
+            dbRoomNew.HostName = hostName;
+            dbRoomNew.SettingsJson = settingsJson;
+            dbRoomNew.PlayersJson = System.Text.Json.JsonSerializer.Serialize(new List<string> { hostName });
+            dbRoomNew.IsStarted = false;
+            dbRoomNew.IsEnded = false;
+            dbRoomNew.UpdatedAt = DateTime.UtcNow;
+        }
+        await _dbContext.SaveChangesAsync();
+
         await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
         await Clients.Caller.SendAsync("RoomCreated", roomId, hostName);
     }
@@ -75,15 +125,35 @@ public class BombGameHub : Hub
     {
         if (!Rooms.TryGetValue(roomId, out var room))
         {
-            if (EndedRooms.TryGetValue(roomId, out var endedRoom))
+            var dbRoom = await _dbContext.GameRooms.FirstOrDefaultAsync(r => r.Id == roomId);
+            if (dbRoom != null)
             {
-                var playersList = endedRoom.Players.Select(p => p.Name).ToList();
-                var playersJson = System.Text.Json.JsonSerializer.Serialize(playersList);
-                await Clients.Caller.SendAsync("RoomEndedButReplayable", roomId, endedRoom.SettingsJson, endedRoom.HostName, playersJson);
+                if (dbRoom.IsEnded)
+                {
+                    var playersList = System.Text.Json.JsonSerializer.Deserialize<List<string>>(dbRoom.PlayersJson) ?? new List<string>();
+                    var playersJson = System.Text.Json.JsonSerializer.Serialize(playersList);
+                    await Clients.Caller.SendAsync("RoomEndedButReplayable", roomId, dbRoom.SettingsJson, dbRoom.HostName, playersJson);
+                    return;
+                }
+
+                // Restore room from DB
+                var restoredPlayers = System.Text.Json.JsonSerializer.Deserialize<List<string>>(dbRoom.PlayersJson) ?? new List<string>();
+                room = new BombRoom
+                {
+                    RoomId = roomId,
+                    HostConnectionId = string.Empty,
+                    HostName = dbRoom.HostName,
+                    SettingsJson = dbRoom.SettingsJson,
+                    IsStarted = dbRoom.IsStarted,
+                    Players = restoredPlayers.Select(name => new BombPlayer { Name = name, ConnectionId = string.Empty, IsHost = name == dbRoom.HostName }).ToList()
+                };
+                Rooms[roomId] = room;
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", "존재하지 않는 방입니다.");
                 return;
             }
-            await Clients.Caller.SendAsync("Error", "존재하지 않는 방입니다.");
-            return;
         }
 
         if (room.IsStarted && !room.Players.Any(p => p.Name == playerName))
@@ -100,7 +170,14 @@ public class BombGameHub : Hub
             var oldConnId = existing.ConnectionId;
             existing.ConnectionId = Context.ConnectionId;
 
-            await Groups.RemoveFromGroupAsync(oldConnId, roomId);
+            if (!string.IsNullOrEmpty(oldConnId))
+            {
+                try
+                {
+                    await Groups.RemoveFromGroupAsync(oldConnId, roomId);
+                }
+                catch { }
+            }
             await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
 
             if (playerName == room.HostName)
@@ -117,6 +194,16 @@ public class BombGameHub : Hub
                 IsHost = false
             });
             await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
+        }
+
+        // Update DB
+        var dbRoomExist = await _dbContext.GameRooms.FirstOrDefaultAsync(r => r.Id == roomId);
+        if (dbRoomExist != null)
+        {
+            var names = room.Players.Select(p => p.Name).ToList();
+            dbRoomExist.PlayersJson = System.Text.Json.JsonSerializer.Serialize(names);
+            dbRoomExist.UpdatedAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
         }
 
         // Notify everyone
@@ -138,10 +225,25 @@ public class BombGameHub : Hub
         room.Players.Remove(player);
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomId);
 
+        // Update DB
+        var dbRoom = await _dbContext.GameRooms.FirstOrDefaultAsync(r => r.Id == roomId);
+        if (dbRoom != null)
+        {
+            var names = room.Players.Select(p => p.Name).ToList();
+            dbRoom.PlayersJson = System.Text.Json.JsonSerializer.Serialize(names);
+            dbRoom.UpdatedAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
+        }
+
         if (player.IsHost || room.Players.Count == 0)
         {
             // Host left — destroy room
             Rooms.TryRemove(roomId, out _);
+            if (dbRoom != null)
+            {
+                dbRoom.IsEnded = true;
+                await _dbContext.SaveChangesAsync();
+            }
             await Clients.Group(roomId).SendAsync("RoomDestroyed", "방장이 나갔습니다.");
         }
         else
@@ -160,6 +262,15 @@ public class BombGameHub : Hub
         if (room.HostConnectionId != Context.ConnectionId) return; // Only host can start
 
         room.IsStarted = true;
+
+        var dbRoom = await _dbContext.GameRooms.FirstOrDefaultAsync(r => r.Id == roomId);
+        if (dbRoom != null)
+        {
+            dbRoom.IsStarted = true;
+            dbRoom.UpdatedAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
+        }
+
         await Clients.Group(roomId).SendAsync("GameStarted", initialStateJson);
     }
 
@@ -189,6 +300,16 @@ public class BombGameHub : Hub
         if (room.HostConnectionId != Context.ConnectionId) return;
 
         room.IsStarted = false;
+
+        var dbRoom = await _dbContext.GameRooms.FirstOrDefaultAsync(r => r.Id == roomId);
+        if (dbRoom != null)
+        {
+            dbRoom.IsStarted = false;
+            dbRoom.IsEnded = true;
+            dbRoom.UpdatedAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
+        }
+
         await Clients.Group(roomId).SendAsync("GameOver", loserName, transferCount);
 
         // Save to EndedRooms before cleaning up
@@ -253,6 +374,22 @@ public class BombGameHub : Hub
             }
             catch { }
         }
+
+        // Fallback to database
+        var dbRoom = await _dbContext.GameRooms.FirstOrDefaultAsync(r => r.Id == roomId);
+        if (dbRoom != null)
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(dbRoom.SettingsJson);
+                if (doc.RootElement.TryGetProperty("gameType", out var typeProp))
+                {
+                    return typeProp.GetString() ?? "bomb";
+                }
+            }
+            catch { }
+        }
+
         return "unknown";
     }
 

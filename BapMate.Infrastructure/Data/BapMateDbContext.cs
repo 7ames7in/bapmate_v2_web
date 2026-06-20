@@ -9,6 +9,7 @@ public class BapMateDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Friend> Friends => Set<Friend>();
+    public DbSet<GameRoom> GameRooms => Set<GameRoom>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -16,5 +17,6 @@ public class BapMateDbContext : DbContext
 
         modelBuilder.Entity<User>().ToTable("Users").Property(e => e.Id).ValueGeneratedNever();
         modelBuilder.Entity<Friend>().ToTable("Friends").Property(e => e.Id).ValueGeneratedNever();
+        modelBuilder.Entity<GameRoom>().ToTable("GameRooms").Property(e => e.Id).ValueGeneratedNever();
     }
 }
