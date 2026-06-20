@@ -18,6 +18,9 @@ public class BombGameHub : Hub
     // Pending invites for offline users (userName → list of invites)
     private static readonly ConcurrentDictionary<string, List<GameInviteMessage>> PendingInvites = new();
 
+    // Registry for recently ended rooms to allow replay
+    private static readonly ConcurrentDictionary<string, BombRoom> EndedRooms = new();
+
     // ─── Room management ────────────────────────────────────────────────
 
     /// <summary>Host creates a new room.</summary>
@@ -72,6 +75,13 @@ public class BombGameHub : Hub
     {
         if (!Rooms.TryGetValue(roomId, out var room))
         {
+            if (EndedRooms.TryGetValue(roomId, out var endedRoom))
+            {
+                var playersList = endedRoom.Players.Select(p => p.Name).ToList();
+                var playersJson = System.Text.Json.JsonSerializer.Serialize(playersList);
+                await Clients.Caller.SendAsync("RoomEndedButReplayable", roomId, endedRoom.SettingsJson, endedRoom.HostName, playersJson);
+                return;
+            }
             await Clients.Caller.SendAsync("Error", "존재하지 않는 방입니다.");
             return;
         }
@@ -181,6 +191,17 @@ public class BombGameHub : Hub
         room.IsStarted = false;
         await Clients.Group(roomId).SendAsync("GameOver", loserName, transferCount);
 
+        // Save to EndedRooms before cleaning up
+        EndedRooms[roomId] = room;
+        if (EndedRooms.Count > 100)
+        {
+            var oldestKey = EndedRooms.Keys.FirstOrDefault();
+            if (oldestKey != null)
+            {
+                EndedRooms.TryRemove(oldestKey, out _);
+            }
+        }
+
         // Clean up room after game ends
         Rooms.TryRemove(roomId, out _);
     }
@@ -213,6 +234,18 @@ public class BombGameHub : Hub
             try
             {
                 using var doc = System.Text.Json.JsonDocument.Parse(room.SettingsJson);
+                if (doc.RootElement.TryGetProperty("gameType", out var typeProp))
+                {
+                    return typeProp.GetString() ?? "bomb";
+                }
+            }
+            catch { }
+        }
+        else if (EndedRooms.TryGetValue(roomId, out var endedRoom))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(endedRoom.SettingsJson);
                 if (doc.RootElement.TryGetProperty("gameType", out var typeProp))
                 {
                     return typeProp.GetString() ?? "bomb";
