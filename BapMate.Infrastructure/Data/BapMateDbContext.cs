@@ -17,6 +17,18 @@ public class BapMateDbContext : DbContext
 
         modelBuilder.Entity<User>().ToTable("Users").Property(e => e.Id).ValueGeneratedNever();
         modelBuilder.Entity<Friend>().ToTable("Friends").Property(e => e.Id).ValueGeneratedNever();
-        modelBuilder.Entity<GameRoom>().ToTable("GameRooms").Property(e => e.Id).ValueGeneratedNever();
+        
+        modelBuilder.Entity<GameRoom>(entity =>
+        {
+            entity.ToTable("gamerooms");
+            entity.Property(e => e.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(e => e.HostName).HasColumnName("hostname");
+            entity.Property(e => e.SettingsJson).HasColumnName("settingsjson");
+            entity.Property(e => e.PlayersJson).HasColumnName("playersjson");
+            entity.Property(e => e.IsStarted).HasColumnName("isstarted");
+            entity.Property(e => e.IsEnded).HasColumnName("isended");
+            entity.Property(e => e.CreatedAt).HasColumnName("createdat");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updatedat");
+        });
     }
 }
