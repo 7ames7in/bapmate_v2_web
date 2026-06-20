@@ -12,10 +12,10 @@ CREATE TABLE IF NOT EXISTS gamerooms (
     hostname VARCHAR(100) NOT NULL,
     
     -- settingsjson: Game settings (timer, game mode, etc.) stored in JSON format
-    settingsjson TEXT NOT NULL DEFAULT '{}',
+    settingsjson JSONB NOT NULL DEFAULT '{}',
     
     -- playersjson: The list of player names currently in the room stored in JSON format
-    playersjson TEXT NOT NULL DEFAULT '[]',
+    playersjson JSONB NOT NULL DEFAULT '[]',
     
     -- isstarted: Boolean flag indicating if the game has started
     isstarted BOOLEAN NOT NULL DEFAULT FALSE,
@@ -52,9 +52,9 @@ CREATE TABLE IF NOT EXISTS users (
     reliabilityscore DOUBLE PRECISION NOT NULL DEFAULT 88.0,
     walletbalance NUMERIC(18,2) NOT NULL DEFAULT 50000.00,
     escrowbalance NUMERIC(18,2) NOT NULL DEFAULT 0.00,
-    badgesjson TEXT NOT NULL DEFAULT '[]',
-    matchpreferencesjson TEXT NOT NULL DEFAULT '{}',
-    defaultgamesettingsjson TEXT NOT NULL DEFAULT '{}',
+    badgesjson JSONB NOT NULL DEFAULT '[]',
+    matchpreferencesjson JSONB NOT NULL DEFAULT '{}',
+    defaultgamesettingsjson JSONB NOT NULL DEFAULT '{}',
     createdat TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedat TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     password VARCHAR(200) NOT NULL DEFAULT '',
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS friends (
     avatar VARCHAR(300) NOT NULL DEFAULT '',
     trustlevel INT NOT NULL DEFAULT 3,
     lastmeal VARCHAR(100) NOT NULL DEFAULT '',
-    tagsjson TEXT NOT NULL DEFAULT '[]',
+    tagsjson JSONB NOT NULL DEFAULT '[]',
     memo VARCHAR(500),
     phone VARCHAR(50),
     identifier VARCHAR(100),

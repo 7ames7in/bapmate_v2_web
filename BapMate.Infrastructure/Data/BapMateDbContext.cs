@@ -32,9 +32,9 @@ public class BapMateDbContext : DbContext
             entity.Property(e => e.ReliabilityScore).HasColumnName("reliabilityscore");
             entity.Property(e => e.WalletBalance).HasColumnName("walletbalance");
             entity.Property(e => e.EscrowBalance).HasColumnName("escrowbalance");
-            entity.Property(e => e.BadgesJson).HasColumnName("badgesjson");
-            entity.Property(e => e.MatchPreferencesJson).HasColumnName("matchpreferencesjson");
-            entity.Property(e => e.DefaultGameSettingsJson).HasColumnName("defaultgamesettingsjson");
+            entity.Property(e => e.BadgesJson).HasColumnName("badgesjson").HasColumnType("jsonb");
+            entity.Property(e => e.MatchPreferencesJson).HasColumnName("matchpreferencesjson").HasColumnType("jsonb");
+            entity.Property(e => e.DefaultGameSettingsJson).HasColumnName("defaultgamesettingsjson").HasColumnType("jsonb");
             entity.Property(e => e.CreatedAt).HasColumnName("createdat");
             entity.Property(e => e.UpdatedAt).HasColumnName("updatedat");
             entity.Property(e => e.Password).HasColumnName("password");
@@ -50,7 +50,7 @@ public class BapMateDbContext : DbContext
             entity.Property(e => e.Avatar).HasColumnName("avatar");
             entity.Property(e => e.TrustLevel).HasColumnName("trustlevel");
             entity.Property(e => e.LastMeal).HasColumnName("lastmeal");
-            entity.Property(e => e.TagsJson).HasColumnName("tagsjson");
+            entity.Property(e => e.TagsJson).HasColumnName("tagsjson").HasColumnType("jsonb");
             entity.Property(e => e.Memo).HasColumnName("memo");
             entity.Property(e => e.Phone).HasColumnName("phone");
             entity.Property(e => e.Identifier).HasColumnName("identifier");
@@ -61,8 +61,8 @@ public class BapMateDbContext : DbContext
             entity.ToTable("gamerooms");
             entity.Property(e => e.Id).HasColumnName("id").ValueGeneratedNever();
             entity.Property(e => e.HostName).HasColumnName("hostname");
-            entity.Property(e => e.SettingsJson).HasColumnName("settingsjson");
-            entity.Property(e => e.PlayersJson).HasColumnName("playersjson");
+            entity.Property(e => e.SettingsJson).HasColumnName("settingsjson").HasColumnType("jsonb");
+            entity.Property(e => e.PlayersJson).HasColumnName("playersjson").HasColumnType("jsonb");
             entity.Property(e => e.IsStarted).HasColumnName("isstarted");
             entity.Property(e => e.IsEnded).HasColumnName("isended");
             entity.Property(e => e.CreatedAt).HasColumnName("createdat");
