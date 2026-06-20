@@ -141,6 +141,7 @@ public class UsersController : ControllerBase
 
     public class EmailRegisterRequest
     {
+        public string Username { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
@@ -152,18 +153,19 @@ public class UsersController : ControllerBase
     [HttpPost("email-register")]
     public async Task<IActionResult> RegisterFromEmail([FromBody] EmailRegisterRequest request, CancellationToken cancellationToken)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password) || string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Phone))
+        if (request is null || string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password) || string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Phone))
         {
             return BadRequest("필수 정보 누락");
         }
 
+        var normalizedUsername = request.Username.Trim();
         var normalizedEmail = request.Email.Trim();
         var normalizedPhone = request.Phone.Trim();
 
-        var exists = await _context.Users.AnyAsync(u => u.Email == normalizedEmail || u.Phone == normalizedPhone, cancellationToken);
+        var exists = await _context.Users.AnyAsync(u => u.Username == normalizedUsername || u.Email == normalizedEmail || u.Phone == normalizedPhone, cancellationToken);
         if (exists)
         {
-            return Conflict("이미 가입된 이메일 또는 휴대폰 번호입니다.");
+            return Conflict("이미 가입된 아이디, 이메일 또는 휴대폰 번호입니다.");
         }
 
         var id = $"email-{Guid.NewGuid():N}";
@@ -171,7 +173,7 @@ public class UsersController : ControllerBase
         var user = new User
         {
             Id = id,
-            Username = normalizedEmail,
+            Username = normalizedUsername,
             PasswordHash = request.Password, // Using password directly as hash for now
             Name = request.Name.Trim(),
             Email = normalizedEmail,
