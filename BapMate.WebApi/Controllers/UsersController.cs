@@ -236,9 +236,18 @@ public class UsersController : ControllerBase
     [HttpGet("{id}/friends")]
     public async Task<ActionResult<IEnumerable<FriendDto>>> GetUserFriends(string id, CancellationToken cancellationToken)
     {
+        var user = await _context.Users
+            .AsNoTracking()
+            .SingleOrDefaultAsync(u => u.Id == id || u.Username == id || u.Email == id, cancellationToken);
+
+        if (user is null)
+            return NotFound($"User {id} not found.");
+
+        var resolvedId = user.Id;
+
         var friends = await _context.Friends
             .AsNoTracking()
-            .Where(f => f.OwnerId == id)
+            .Where(f => f.OwnerId == resolvedId)
             .ToListAsync(cancellationToken);
 
         return Ok(friends.Select(ToFriendDto));
@@ -254,26 +263,29 @@ public class UsersController : ControllerBase
             return BadRequest("Payload required.");
         if (string.IsNullOrWhiteSpace(newFriend.Id))
             return BadRequest("Friend Id required.");
-        if (id == newFriend.Id)
-            return BadRequest("Cannot add yourself.");
 
-        var ownerExists = await _context.Users
+        var user = await _context.Users
             .AsNoTracking()
-            .AnyAsync(u => u.Id == id, cancellationToken);
+            .SingleOrDefaultAsync(u => u.Id == id || u.Username == id || u.Email == id, cancellationToken);
 
-        if (!ownerExists)
+        if (user is null)
             return NotFound($"User {id} not found.");
+
+        var resolvedId = user.Id;
+
+        if (resolvedId == newFriend.Id)
+            return BadRequest("Cannot add yourself.");
 
         var duplicate = await _context.Friends
             .AsNoTracking()
-            .AnyAsync(f => f.OwnerId == id && f.Id == newFriend.Id, cancellationToken);
+            .AnyAsync(f => f.OwnerId == resolvedId && f.Id == newFriend.Id, cancellationToken);
 
         if (duplicate)
             return Conflict("Already linked.");
 
         var friend = new Friend
         {
-            OwnerId = id,
+            OwnerId = resolvedId,
             Id = newFriend.Id,
             Name = string.IsNullOrWhiteSpace(newFriend.Name) ? "비회원 친구" : newFriend.Name,
             Avatar = newFriend.Avatar ?? string.Empty,
@@ -294,8 +306,17 @@ public class UsersController : ControllerBase
     [HttpDelete("{id}/friends/{friendId}")]
     public async Task<IActionResult> DeleteFriend(string id, string friendId, CancellationToken cancellationToken)
     {
+        var user = await _context.Users
+            .AsNoTracking()
+            .SingleOrDefaultAsync(u => u.Id == id || u.Username == id || u.Email == id, cancellationToken);
+
+        if (user is null)
+            return NotFound($"User {id} not found.");
+
+        var resolvedId = user.Id;
+
         var friend = await _context.Friends
-            .SingleOrDefaultAsync(f => f.OwnerId == id && f.Id == friendId, cancellationToken);
+            .SingleOrDefaultAsync(f => f.OwnerId == resolvedId && f.Id == friendId, cancellationToken);
 
         if (friend is null)
             return NotFound();
