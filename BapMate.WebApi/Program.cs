@@ -17,25 +17,8 @@ builder.Services.AddCors(opt =>
     {
         policy.AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials();
-
-        if (allowedOrigins.Count > 0)
-        {
-            policy.SetIsOriginAllowed(origin =>
-            {
-                if (string.IsNullOrWhiteSpace(origin))
-                {
-                    return false;
-                }
-
-                var normalized = origin.TrimEnd('/');
-                return allowedOrigins.Contains(normalized);
-            });
-        }
-        else
-        {
-            policy.SetIsOriginAllowed(_ => true);
-        }
+              .AllowCredentials()
+              .SetIsOriginAllowed(_ => true);
     });
 });
 
